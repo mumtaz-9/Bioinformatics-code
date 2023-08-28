@@ -1,0 +1,32 @@
+This code gets the downloaded fasta files from the ten randomly selected ones and segments them into 500 base pairs for readability.
+
+#!/bin/bash
+
+assembly_dir="Documents/test/YR_Strains"
+output_dir="Documents/test/Segmented_Assemblies"
+shred_path="$HOME/Documents/test/shred.sh"
+
+mkdir -p "$output_dir"
+
+echo "Processing files in $assembly_dir directory:"
+for file in "$assembly_dir"/*.fasta; do
+  if [[ -f "$file" ]]; then
+    echo "Processing file: $file"
+    genome=$(basename "$file" .fasta)
+    segmented_file="${output_dir}/${genome}-segmented.fasta"
+
+    "$shred_path" in="$file" out="$segmented_file" length=500
+
+    # Get the total number of reads
+    total_reads=$(grep -c '^>' "$file")
+
+    # Get the start and end base pairs for each segmented region
+    start_bp=1
+    end_bp=500
+
+    # Append contig information to the segmented file
+    echo ">Contig_1 $total_reads reads from $genome (trimmed) (normalized) assembled using Geneious_${start_bp}-${end_bp}" >> "$segmented_file"
+  fi
+done
+
+echo "Script execution completed."
