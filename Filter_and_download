@@ -1,0 +1,67 @@
+This code filters the ncbi assembly database for the specific genus you enter and randomly selects 10 from the genus and downloads them.
+
+#!/bin/bash
+
+# Set the database directory
+database_dir="db_genus"
+
+# Create the database directory if it doesn't exist
+mkdir -p "$database_dir"
+
+# Read user input for the genus
+echo "Enter the genus name:"
+read genus
+
+# Convert genus to lowercase
+genus=$(echo "$genus" | tr '[:upper:]' '[:lower:]')
+
+# Filter assembly_summary.txt for the user-defined genus and complete genomes
+filtered_lines=$(awk -F '\t' -v OFS='\t' -v g="$genus" '
+
+    BEGIN {
+        print "##  See ftp://ftp.ncbi.nlm.nih.gov/genomes/README_assembly_summary.txt for a description of the columns in this file."
+        print "#assembly_accession\tbioproject\tbiosample\twgs_master\trefseq_category\ttaxid\tspecies_taxid\torganism_name\tinfraspecific_name\tisolate\tversion_status\tassembly_level\trelease_type\tgenome_rep\tseq_rel_date\tasm_name\tsubmitter\tgbrs_paired_asm\tpaired_asm_comp\tftp_path\texcluded_from_refseq\trelation_to_type_material\tasm_not_live_date"
+    }
+    $12 == "Complete Genome" && tolower($8) ~ g {
+        print
+    }
+' assembly_summary.txt)
+
+# Creates a separate file for the genus
+filename="${genus}_assembly_summary.txt"
+echo "$filtered_lines" > "$filename"
+
+# Counts the number of lines in the filtered file
+num_lines=$(wc -l < "$filename")
+
+# Randomly selects up to ten assembly files
+if [ "$num_lines" -gt 15 ]; then
+sampled_lines=$(shuf -n 10 "$filename")
+else
+sampled_lines="$filtered_lines"
+fi
+
+# Creates a separate file for the randomly selected genomes
+sampled_filename="${genus}_sampled_summary.txt"
+echo "$sampled_lines" > "$sampled_filename"
+
+# Downloads the fasta files
+echo "Downloading fasta files..."
+echo "What do you want to call this database?"
+    read DB
+# Converts records.txt into downloadable format
+    awk -F $'\t' '{print $20 "/" $1 "_" $16 "_cds_from_genomic.fna.gz"}' ${genus}_sampled_summary.txt > assemblies.txt
+
+    # Downloads and concatenates assembly files
+    wget -i assemblies.txt
+    cat *.fna.gz >> db_${DB}.fasta.gz
+    rm *.fna.gz
+
+    # unzip and clean-up
+    gzip -dk db_${DB}.fasta.gz
+    mkdir db_${DB}_meta
+    mv db_${DB}.fasta.gz db_${DB}_meta/
+    mv _sampled_summary.txt db_${DB}_meta/db_${DB}_records.txt
+    mv assemblies.txt db_${DB}_meta/db_${DB}_assemblies.txt
+
+echo "Assembly files downloaded for $genus"
