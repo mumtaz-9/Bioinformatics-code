@@ -1,0 +1,75 @@
+This code was created to segment the fasta files even more as they were to large to process. This code segments the files and places 25 contigs per file.
+
+#!/bin/bash
+
+# Check if the correct number of arguments is provided
+if [ $# -lt 3 ]; then
+    echo "Usage: $0 <input_fna_file> <output_prefix> <contigs_per_file>"
+    exit 1
+fi
+
+# Input arguments
+input_file=$1
+output_prefix=$2
+contigs_per_file=25  # Change this value to 25
+
+# Check if the input FASTA file exists
+if [ ! -f "$input_file" ]; then
+    echo "Input FASTA file not found: $input_file"
+    exit 1
+fi
+
+# Check if the number of contigs per file is valid
+if [ "$contigs_per_file" -lt 1 ]; then
+    echo "Invalid number of contigs per file: $contigs_per_file"
+    exit 1
+fi
+
+# Create a unique output directory for the input file
+input_filename=$(basename "$input_file")
+output_dir="${output_prefix}_${input_filename%.*}_segments"
+mkdir -p "$output_dir"
+
+# Count the total number of contigs in the input file
+total_contigs=$(grep -c "^>" "$input_file")
+
+# Calculate the number of segments required
+num_segments=$(( (total_contigs + contigs_per_file - 1) / contigs_per_file ))
+
+# Function to split the file based on the number of contigs
+function split_file {
+    input_file="$1"
+    output_dir="$2"
+    contigs_per_file="$3"
+    segment_num="$4"
+
+    # Extract the desired segment using awk and save to a temporary file
+    awk -v start="^>" \
+        -v end="^>" \
+        -v contigs="$contigs_per_file" \
+        -v segment="$segment_num" \
+        'BEGIN {count = 0; file_num = 1}
+         {
+            if ($0 ~ start) {
+                count++;
+                if (count > contigs) {
+                    count = 1;
+                    file_num++;
+                }
+                if (file_num == segment) {
+                    printf "%s\n", $0;
+                    next;
+                }
+            }
+            if (file_num == segment) {
+                printf "%s\n", $0;
+            }
+         }' "$input_file" > "${output_dir}/${output_prefix}_segment_${segment_num}.fna"
+}
+
+# Loop through and split the file into segments based on the number of contigs
+for (( segment_num = 1; segment_num <= num_segments; segment_num++ )); do
+    split_file "$input_file" "$output_dir" "$contigs_per_file" "$segment_num"
+done
+
+echo "Segmentation completed successfully. Segmented files are stored in: $output_dir"
