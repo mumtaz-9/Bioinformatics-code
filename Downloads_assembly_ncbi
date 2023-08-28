@@ -1,0 +1,6 @@
+This code downloads the assembly summary file from ncbi.
+
+#!/bin/bash
+
+# Downloads the assembly_summary.txt file
+curl -o assembly_summary.txt ftp://ftp.ncbi.nlm.nih.gov/genomes/ASSEMBLY_REPORTS/assembly_summary_refseq.txt
